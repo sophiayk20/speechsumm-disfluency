@@ -1,4 +1,4 @@
-# Fix at replacement_rate == 2 for now
+# Fix at replacement_rate == 2 for this code
 
 from datasets import load_dataset
 from tqdm import tqdm
