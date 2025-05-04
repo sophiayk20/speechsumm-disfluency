@@ -1,5 +1,3 @@
-# Fix at replacement_rate == 2 for this code
-
 from datasets import load_dataset
 from tqdm import tqdm
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -8,6 +6,8 @@ from itertools import zip_longest
 from python_files.disfluency_generation import LARD # should be in topic-controllable-summarization directory
 import re
 import os
+import shutil
+shutil.rmtree('/content/drive/MyDrive/ling384/repetitions') # remove this folder in case it was already created
 
 dataset = load_dataset("knkarthick/dialogsum", split='test')
 
@@ -132,7 +132,35 @@ def generate_repetition_both_speakers(instance_id, dialogue_dict, mode=Literal['
 
   return dialogue_running
 
-for MODE in ['ATAS', 'ATOS', 'OTAS', 'OTOS']:
+#for MODE in ['ATAS', 'ATOS', 'OTAS', 'OTOS']:
+for MODE in ['OTOS']:
   print(f"Generating for this mode.... {MODE}!!")
   for instance_id in tqdm(speaker_monologues.keys()):
     generate_repetition_both_speakers(instance_id, speaker_monologues[instance_id], mode=MODE, repetition_degree=2)
+  
+  disfluent_dialogues = []
+  dialogues= []
+  ids = []
+  summaries= []
+
+  for instance in tqdm(dataset):
+    ids.append(instance['id'])
+    summaries.append(instance['summary'])
+    with open(f"/content/drive/MyDrive/ling384/repetitions/both_speakers/{MODE}-output/{instance['id']}.txt", 'r') as f:
+      lines = f.readlines()
+
+    text = ''.join(lines).strip()
+    disfluent_dialogues.append(text)
+    dialogues.append(instance['dialogue'])
+
+  assert(len(dialogues) == len(disfluent_dialogues) == len(ids) == len(summaries) == 1500)
+
+  data = {
+      'id': ids,
+      'dialogue': dialogues,
+      'disfluent_dialogue': disfluent_dialogues,
+      'summary': summaries,
+  }
+
+  dataset = Dataset.from_dict(data)
+  dataset.push_to_hub("sophiayk20/repetition-both-speakers", split=MODE)
