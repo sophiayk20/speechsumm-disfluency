@@ -6,7 +6,9 @@
 
 ## Tech Stack
 - Python
-- HuggingFace transformers, datasets
+- LARD algorithm, NLTK sent_tokenize, word_tokenize
+- PyTorch, HuggingFace transformers, datasets, evaluate (ROUGE, METEOR, COMET)
+- Compute: T4 GPU via Google Colab
 
 ## Project Motivation
 
@@ -14,6 +16,7 @@ This paper examines the psycholinguistic phenomenon of speech disfluency. Speech
 
 ## Methodology
 - LARD algorithm
+- Summarization Model: BART-large-CNN
 
 ## Results
 
