@@ -5,6 +5,8 @@
 - Sophia Kang
 
 ## Tech Stack
+- Python
+- HuggingFace transformers, datasets
 
 ## Project Motivation
 Speech disfluency refers to
