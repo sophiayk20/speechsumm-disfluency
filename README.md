@@ -9,7 +9,8 @@
 - HuggingFace transformers, datasets
 
 ## Project Motivation
-Speech disfluency refers to
+
+This paper examines the psycholinguistic phenomenon of speech disfluency. Speech disfluency refers to
 
 ## Methodology
 - LARD algorithm
