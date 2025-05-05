@@ -40,7 +40,7 @@ print(f"ROUGE-2: {round(100*result['rouge2'], 2)}")
 
 comet_metric = evaluate.load('comet')
 comet_score = comet_metric.compute(predictions=predictions, references=dataset['summary'], sources=dataset['disfluent_dialogue'])
-print(comet_score)
+print(f"COMET: {round(100*comet_score['mean_score'], 2)}")
 
 meteor = evaluate.load('meteor')
 results = meteor.compute(predictions=predictions, references=dataset['summary'])
