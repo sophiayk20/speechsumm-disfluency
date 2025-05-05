@@ -3,60 +3,163 @@ from tqdm import tqdm
 from nltk.tokenize import sent_tokenize, word_tokenize
 from typing import Literal
 from itertools import zip_longest
-from python_files.disfluency_generation import LARD # should be in topic-controllable-summarization directory
+from python_files.disfluency_generation import LARD  # should be in topic-controllable-summarization directory
 import re
+import random
 import os
-import 
+import shutil
+import nltk
 
-def generate_replacement_one_speaker(instance_id, dialogue_dict, mode=Literal['ATAS', 'OTAS', 'ATOS', 'OTOS']):
-  """
+nltk.download('wordnet')
 
-    Given dialogue_dict, return disfluent dialogue in string form
-    Generates at least 1 replacement disfluency in each turn
+# Instantiate LARD object
+lard = LARD()
 
-  """
+person_ids = ['#Person1#', '#Person2#']
+global_turn_flag = {person_id: False for person_id in person_ids}
+BASE_FOLDER = "/content/drive/MyDrive/ling384/replacements/one_speaker"
 
-  global global_turn_flag
-  # set global turn flag to false at dialogue level
-  global_turn_flag = {person_id:False for person_id in person_ids} 
-  random.seed(42)
 
-  dialogue_running = ""
+def process_turn(person_id, person_turns, mode, BASE_FOLDER):
+    global global_turn_flag
+    running = ""
 
-  BASE_FOLDER=f"/content/drive/MyDrive/ling384/replacements/one_speaker"
-  os.makedirs(BASE_FOLDER, exist_ok=True)
-  OUTPUT_FOLDER=f"{BASE_FOLDER}/{mode}-output"
-  os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-  
-  # for each set of sentences that a pereson says in a single turn
-  # person1_turns: 'Hi, Mr. Smith. I'm Doctor Hawkins. Why are you here today?'
-  for person1_turn, person2_turn in zip_longest(dialogue_dict[person_ids[0]], dialogue_dict[person_ids[1]]):
-      replacement_index = random.choice([0, 1])
+    with open(f"{BASE_FOLDER}/replacement_{mode}_stat.txt", "a") as f:
+        person_turns_sentences = sent_tokenize(person_turns)
 
-      if person1_turn:
-        # if this person replaces
-        if replacement_index == 0:
-          ret = process_turn(person_ids[0], person1_turn, mode, BASE_FOLDER)
-          dialogue_running += ret
-          dialogue_running += '\n'
-        # else, other person replaces, so keep original sentence
-        else:
-          dialogue_running += f"{person_ids[0]}: "
-          dialogue_running += person1_turn
-          dialogue_running += '\n'
-      
-      if person2_turn:
-        # if this person replaces
-        if replacement_index == 1:
-          ret = process_turn(person_ids[1], person2_turn, mode, BASE_FOLDER)
-          dialogue_running += ret
-          dialogue_running += '\n'
-        else:
-          dialogue_running += f"{person_ids[1]}: "
-          dialogue_running += person2_turn
-          dialogue_running += '\n'
+        turn_flag = False
+        disfluency_count = 0
+        speaker_running = []
 
-  with open(f"{OUTPUT_FOLDER}/{instance_id}.txt", "w") as f:
-    f.write(dialogue_running)
-  
-  return dialogue_running
+        for person_sentence in person_turns_sentences:
+            word_rep = word_tokenize(person_sentence)
+            string_rep = ' '.join(word_rep)
+
+            if mode == "ATOS" and turn_flag:
+                speaker_running.append(person_sentence)
+                continue
+            if mode in ["OTOS", "OTAS"] and global_turn_flag[person_id]:
+                speaker_running.append(person_sentence)
+                continue
+
+            disfluency = lard.create_replacements(string_rep)
+
+            if disfluency[0]:
+                tokens = disfluency[0].split()
+                rejoined_sentence = ' '.join(tokens)
+                rejoined_sentence = re.sub(r'\s([.,!?;])', r'\1', rejoined_sentence)
+                rejoined_sentence = re.sub(r"\sn't", "n't", rejoined_sentence)
+                speaker_running.append(rejoined_sentence)
+
+                disfluency_count += 1
+
+                if mode == "ATOS":
+                    turn_flag = True
+            else:
+                speaker_running.append(person_sentence)
+
+        running += f"{person_id}: " + " ".join(speaker_running) + "\n"
+
+        if disfluency_count > 0 and mode in ['OTAS', 'OTOS']:
+            global_turn_flag[person_id] = True
+
+        f.write(f"{disfluency_count}\n")
+
+    return running
+
+
+def generate_replacement_one_speaker(
+    instance_id,
+    dialogue_dict,
+    mode: Literal['ATAS', 'OTAS', 'ATOS', 'OTOS'] = 'ATOS'
+):
+    """
+    Given dialogue_dict, return disfluent dialogue in string form.
+    Generates at least 1 replacement disfluency in each turn.
+    """
+    global global_turn_flag
+    global_turn_flag = {person_id: False for person_id in person_ids}
+    random.seed(42)
+
+    dialogue_running = ""
+
+    BASE_FOLDER = "/content/drive/MyDrive/ling384/replacements/one_speaker"
+    os.makedirs(BASE_FOLDER, exist_ok=True)
+    OUTPUT_FOLDER = f"{BASE_FOLDER}/{mode}-output"
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    for person1_turn, person2_turn in zip_longest(dialogue_dict[person_ids[0]], dialogue_dict[person_ids[1]]):
+        replacement_index = random.choice([0, 1])
+
+        if person1_turn:
+            if replacement_index == 0:
+                ret = process_turn(person_ids[0], person1_turn, mode, BASE_FOLDER)
+                dialogue_running += ret + '\n'
+            else:
+                dialogue_running += f"{person_ids[0]}: {person1_turn}\n"
+
+        if person2_turn:
+            if replacement_index == 1:
+                ret = process_turn(person_ids[1], person2_turn, mode, BASE_FOLDER)
+                dialogue_running += ret + '\n'
+            else:
+                dialogue_running += f"{person_ids[1]}: {person2_turn}\n"
+
+    with open(f"{OUTPUT_FOLDER}/{instance_id}.txt", "w") as f:
+        f.write(dialogue_running)
+
+    return dialogue_running
+
+
+# Load dataset and prepare monologues
+dataset = load_dataset("knkarthick/dialogsum", split='test')
+speaker_monologues = {}
+
+for instance in tqdm(dataset):
+    instance_id = instance['id']
+    speaker_monologues[instance_id] = {}
+    dialogues = instance['dialogue'].split('\n')
+    for dialogue in dialogues:
+        speaker_identity, sentences = dialogue.split(':', 1)
+        sentences = sentences.strip()
+        if speaker_identity not in speaker_monologues[instance_id]:
+            speaker_monologues[instance_id][speaker_identity] = []
+        speaker_monologues[instance_id][speaker_identity].append(sentences)
+
+print(len(speaker_monologues))  # Should be 1500
+
+
+# Main loop for generation and dataset creation
+for MODE in ['ATAS', 'ATOS', 'OTAS', 'OTOS']:
+    random.seed(42) # set seed
+    shutil.rmtree('/content/drive/MyDrive/ling384/replacements', ignore_errors=True)
+
+    print(f"Generating for this mode.... {MODE}!!")
+    for instance_id in tqdm(speaker_monologues.keys()):
+        generate_replacement_one_speaker(instance_id, speaker_monologues[instance_id], mode=MODE)
+
+    disfluent_dialogues = []
+    dialogues = []
+    ids = []
+    summaries = []
+
+    for instance in tqdm(dataset):
+        ids.append(instance['id'])
+        summaries.append(instance['summary'])
+        with open(f"/content/drive/MyDrive/ling384/replacements/one_speaker/{MODE}-output/{instance['id']}.txt", 'r') as f:
+            lines = f.readlines()
+        text = ''.join(lines).strip()
+        disfluent_dialogues.append(text)
+        dialogues.append(instance['dialogue'])
+
+    assert len(dialogues) == len(disfluent_dialogues) == len(ids) == len(summaries) == 1500
+
+    data = {
+        'id': ids,
+        'dialogue': dialogues,
+        'disfluent_dialogue': disfluent_dialogues,
+        'summary': summaries,
+    }
+
+    dataset = dataset.from_dict(data)
+    dataset.push_to_hub(f"sophiayk20/replacement-one-speaker", split=MODE)

@@ -16,7 +16,7 @@ This paper examines the psycholinguistic phenomenon of speech disfluency. Speech
 
 ## Methodology
 - LARD algorithm
-- Summarization Model: BART-large-CNN
+- Summarization Model: `facebook/BART-large-CNN`
 
 ## Results
 
