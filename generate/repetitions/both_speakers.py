@@ -8,9 +8,7 @@ import re
 import os
 import shutil
 
-# Remove this folder in case it was already created
-shutil.rmtree('/content/drive/MyDrive/ling384/repetitions', ignore_errors=True)
-
+REPETITION_DEGREE=1
 # Load test dataset
 dataset = load_dataset("knkarthick/dialogsum", split='test')
 
@@ -36,7 +34,7 @@ person_ids = ['#Person1#', '#Person2#']
 global_turn_flag = {person_id: False for person_id in person_ids}
 
 
-def process_turn(person_id, person_turns, mode, BASE_FOLDER, repetition_degree=2):
+def process_turn(person_id, person_turns, mode, BASE_FOLDER, repetition_degree):
     global person_ids, global_turn_flag
 
     running = ""
@@ -120,10 +118,13 @@ def generate_repetition_both_speakers(instance_id, dialogue_dict, mode=Literal['
 
 
 # Main loop for generation and dataset creation
-for MODE in ['OTOS']:  # can be changed to other modes if needed
+for MODE in ['ATAS', 'ATOS', 'OTAS', 'OTOS']:  # can be changed to other modes if needed
+    # Remove this folder in case it was already created
+    shutil.rmtree('/content/drive/MyDrive/ling384/repetitions', ignore_errors=True)
+
     print(f"Generating for this mode.... {MODE}!!")
     for instance_id in tqdm(speaker_monologues.keys()):
-        generate_repetition_both_speakers(instance_id, speaker_monologues[instance_id], mode=MODE, repetition_degree=2)
+        generate_repetition_both_speakers(instance_id, speaker_monologues[instance_id], mode=MODE, repetition_degree=REPETITION_DEGREE)
 
     disfluent_dialogues = []
     dialogues = []
@@ -150,4 +151,4 @@ for MODE in ['OTOS']:  # can be changed to other modes if needed
     }
 
     dataset = Dataset.from_dict(data)
-    dataset.push_to_hub("sophiayk20/repetition-both-speakers", split=MODE)
+    dataset.push_to_hub(f"sophiayk20/repetition-both-speakers-r-{REPETITION_DEGREE}", split=MODE)
