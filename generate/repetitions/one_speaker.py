@@ -9,9 +9,6 @@ import os
 import random
 import shutil
 
-# Clean up previous output directory if exists
-shutil.rmtree('/content/drive/MyDrive/ling384/repetitions', ignore_errors=True)
-
 # Load dataset
 dataset = load_dataset("knkarthick/dialogsum", split='test')
 
@@ -106,14 +103,14 @@ def generate_repetition_one_speaker(instance_id, dialogue_dict, mode=Literal['AT
 
         if person1_turn:
             if repetition_index == 0:
-                ret = process_turn(person_ids[0], person1_turn, mode, BASE_FOLDER)
+                ret = process_turn(person_ids[0], person1_turn, mode, BASE_FOLDER, repetition_degree)
                 dialogue_running += ret + '\n'
             else:
                 dialogue_running += f"{person_ids[0]}: {person1_turn}\n"
 
         if person2_turn:
             if repetition_index == 1:
-                ret = process_turn(person_ids[1], person2_turn, mode, BASE_FOLDER)
+                ret = process_turn(person_ids[1], person2_turn, mode, BASE_FOLDER, repetition_degree)
                 dialogue_running += ret + '\n'
             else:
                 dialogue_running += f"{person_ids[1]}: {person2_turn}\n"
@@ -125,7 +122,11 @@ def generate_repetition_one_speaker(instance_id, dialogue_dict, mode=Literal['AT
 
 
 # Generate disfluencies and push dataset to hub
-for MODE in ['OTOS']:
+for MODE in ['ATAS', 'ATOS', 'OTAS', 'OTOS']:
+    random.seed(42)
+    # Clean up previous output directory if exists
+    shutil.rmtree('/content/drive/MyDrive/ling384/restarts', ignore_errors=True)
+
     print(f"Generating for this mode.... {MODE}!!")
     for instance_id in tqdm(speaker_monologues.keys()):
         generate_repetition_one_speaker(instance_id, speaker_monologues[instance_id], mode=MODE, repetition_degree=2)
@@ -160,4 +161,4 @@ for MODE in ['OTOS']:
     }
 
     dataset = Dataset.from_dict(data)
-    dataset.push_to_hub("sophiayk20/repetition-one-speaker", split=MODE)
+    dataset.push_to_hub("sophiayk20/repetition-one-speaker-r-2", split=MODE)
