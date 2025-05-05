@@ -1,0 +1,167 @@
+from datasets import load_dataset, Dataset
+from tqdm import tqdm
+from nltk.tokenize import sent_tokenize, word_tokenize
+from typing import Literal
+from itertools import zip_longest
+from python_files.disfluency_generation import LARD  # should be in topic-controllable-summarization directory
+import re
+import os
+import shutil
+import random
+
+# Load test dataset
+dataset = load_dataset("knkarthick/dialogsum", split='test')
+
+# Collect speaker monologues
+speaker_monologues = {}
+for instance in tqdm(dataset):
+    instance_id = instance['id']
+    speaker_monologues[instance_id] = {}
+    dialogues = instance['dialogue'].split('\n')
+    for dialogue in dialogues:
+        speaker_identity, sentences = dialogue.split(':', 1)
+        sentences = sentences.strip()
+        if speaker_identity not in speaker_monologues[instance_id]:
+            speaker_monologues[instance_id][speaker_identity] = []
+        speaker_monologues[instance_id][speaker_identity].append(sentences)
+
+print(len(speaker_monologues.keys()))  # Should be 1500
+
+# Instantiate LARD
+lard = LARD()
+
+person_ids = ['#Person1#', '#Person2#']
+global_turn_flag = {person_id: False for person_id in person_ids}
+
+def get_random_consecutive_indices(lst):
+  # sanity check, don't call on len(lst) < 2
+  assert(len(lst) >= 2)
+  index = random.randint(0, len(lst) - 2)
+  return index, index+1
+
+def process_turn(person_id, person_turns, mode, BASE_FOLDER):
+    global person_ids, global_turn_flag
+
+    running = ""
+
+    with open(f"{BASE_FOLDER}/restart_{mode}_stat.txt", "a") as f:
+        person_turn_sentences = sent_tokenize(person_turns)
+
+        turn_flag = False
+        disfluency_count = 0
+        speaker_running = []
+
+        # if this person has less than 2 utterances or has already introduced disfluency in OTOS mode
+        if len(person_turn_sentences) < 2 or (mode == 'OTOS' and global_turn_flag.get(person_id, False)):
+            for person_sentence in person_turn_sentences:
+                speaker_running.append(person_sentence)
+        else:
+            # choose 2 consecutive indices
+            disfluency_indices = get_random_consecutive_indices(person_turn_sentences)
+            processed = [False] * len(person_turn_sentences)
+
+            for i, person_sentence in enumerate(person_turn_sentences):
+                if i == disfluency_indices[0] and (not processed[i] and not processed[i+1]):
+                    disfluency = lard.create_restarts(
+                        person_turn_sentences[disfluency_indices[0]],
+                        person_turn_sentences[disfluency_indices[1]]
+                    )
+
+                    if disfluency[0]:
+                        tokens = disfluency[0].split()
+                        rejoined_sentence = ' '.join(tokens)
+                        rejoined_sentence = re.sub(r'\s([.,!?;])', r'\1', rejoined_sentence)
+                        rejoined_sentence = re.sub(r"\sn't", "n't", rejoined_sentence)
+                        speaker_running.append(rejoined_sentence)
+                        disfluency_count += 1
+
+                        if mode == "ATOS":
+                            turn_flag = True
+
+                        processed[i] = True
+                        processed[i + 1] = True
+                    else:
+                        speaker_running.append(person_sentence)
+                elif not processed[i]:
+                    speaker_running.append(person_sentence)
+                    processed[i] = True
+
+        running += f"{person_id}: " + " ".join(speaker_running) + "\n"
+
+        if disfluency_count > 0 and mode in ['OTAS', 'OTOS']:
+            global_turn_flag[person_id] = True
+
+        f.write(f"{disfluency_count}\n")
+
+    return running
+
+
+def generate_restarts_both_speakers(instance_id, dialogue_dict, mode=Literal['ATOS', 'OTOS']):
+    """
+    Given a dialogue dict, return disfluent dialogue as a string.
+    Generates at least 1 repetition disfluency in each turn.
+    """
+    person1_num_speaks = len(dialogue_dict['#Person1#'])
+    person2_num_speaks = len(dialogue_dict['#Person2#'])
+
+    global global_turn_flag
+    global_turn_flag = {person_id: False for person_id in person_ids}
+
+    dialogue_running = ""
+
+    BASE_FOLDER = "/content/drive/MyDrive/ling384/restarts/both_speakers"
+    os.makedirs(BASE_FOLDER, exist_ok=True)
+    OUTPUT_FOLDER = f"{BASE_FOLDER}/{mode}-output"
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    for person1_turn, person2_turn in zip_longest(dialogue_dict[person_ids[0]], dialogue_dict[person_ids[1]]):
+        if person1_turn:
+            ret = process_turn(person_ids[0], person1_turn, mode, BASE_FOLDER)
+            dialogue_running += ret + '\n'
+
+        if person2_turn:
+            ret = process_turn(person_ids[1], person2_turn, mode, BASE_FOLDER)
+            dialogue_running += ret + '\n'
+
+    with open(f"{OUTPUT_FOLDER}/{instance_id}.txt", "w") as f:
+        f.write(dialogue_running)
+
+    return dialogue_running
+
+
+# Main loop for generation and dataset creation
+for MODE in ['ATOS', 'OTOS']:  # can be changed to other modes if needed
+    random.seed(42)
+    # Remove this folder in case it was already created
+    shutil.rmtree('/content/drive/MyDrive/ling384/restarts', ignore_errors=True)  
+
+    print(f"Generating for this mode.... {MODE}!!")
+    for instance_id in tqdm(speaker_monologues.keys()):
+        generate_restarts_both_speakers(instance_id, speaker_monologues[instance_id], mode=MODE)
+
+    disfluent_dialogues = []
+    dialogues = []
+    ids = []
+    summaries = []
+
+    for instance in tqdm(dataset):
+        ids.append(instance['id'])
+        summaries.append(instance['summary'])
+        with open(f"/content/drive/MyDrive/ling384/restarts/both_speakers/{MODE}-output/{instance['id']}.txt", 'r') as f:
+            lines = f.readlines()
+
+        text = ''.join(lines).strip()
+        disfluent_dialogues.append(text)
+        dialogues.append(instance['dialogue'])
+
+    assert len(dialogues) == len(disfluent_dialogues) == len(ids) == len(summaries) == 1500
+
+    data = {
+        'id': ids,
+        'dialogue': dialogues,
+        'disfluent_dialogue': disfluent_dialogues,
+        'summary': summaries,
+    }
+
+    dataset = Dataset.from_dict(data)
+    dataset.push_to_hub("sophiayk20/restarts-both-speakers", split=MODE)
