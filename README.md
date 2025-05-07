@@ -21,8 +21,10 @@ This paper examines the psycholinguistic phenomenon of speech disfluency. Speech
 - LARD algorithm
 - Summarization Model: `facebook/BART-large-CNN`
 
-## Results
+## Main Contributions
+- We introduce disfluency in multi-speaker dialogues by varying the number of disfluent speakers, turns, and utterances using the LARD algorithm with three disfluency types - repetitions, replacements, and restarts.
+- We demonstrate that the summarization perfromance degrades with increasing disfluency complexity and identify that disfluency span has a stronger impact on ROUGE scores than number of interruption points.
+- We reveal that among the three disfluency types examined, replacement disfluency has the most detrimental effect on summarization, both in single- and mixed-disfluency settings.
 
-
-## Code
+## Notes on Code
 - `artificial-disfluency-generation/python_files/create_dataset.py` will not work with HuggingFace datasets due to deprecated version of dataframe feature when using concat dataframe. I have included an altered version of the file that I have used for experiments in `artificial-disfluency-generation`.
