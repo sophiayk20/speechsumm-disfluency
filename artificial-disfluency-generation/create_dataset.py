@@ -239,9 +239,11 @@ def create_dataset(input_file_path,
                 else:
                     print("Setting percentages...\n")
 
-            if percentages_with_fluent[2] != 0:
-                if replacement_types_percentage is None:
-                    raise ValueError("replacement_types_percentage is required when replacement percentage > 0.")
+            if percentages_with_fluent[3] != 0: # generating replacements
+                print(replacement_types_percentage)
+                print(percentages_with_fluent)
+                #if replacement_types_percentage is None:
+                    #raise ValueError("replacement_types_percentage is required when replacement percentage > 0.")
                 noun_with_cue = replacement_types_percentage[0]
                 noun_without_cue = replacement_types_percentage[1]
                 verb_with_cue = replacement_types_percentage[2]
