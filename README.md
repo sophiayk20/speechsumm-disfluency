@@ -11,7 +11,7 @@
 - Compute: L4 and T4 GPU via Google Colab
 
 ## Required Libraries
-- LARD: `git clone https://github.com/tatianapassali/artificial-disfluency-generation.git` and `%cd /content/artificial-disfluency-generation`
+- LARD: `git clone https://github.com/tatianapassali/artificial-disfluency-generation.git` and `%cd /content/artificial-disfluency-generation` (if on Colab, else cd into artificial-disfluency-generation)
 
 ## Project Motivation
 
